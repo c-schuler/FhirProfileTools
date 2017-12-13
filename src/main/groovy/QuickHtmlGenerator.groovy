@@ -11,6 +11,7 @@
  their occurrence.
 */
 import groovy.transform.TypeChecked
+import org.apache.commons.io.FileUtils
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang.StringEscapeUtils
 import org.apache.commons.lang.StringUtils
@@ -109,6 +110,7 @@ class QuickHtmlGenerator extends FhirSimpleBase {
     static final Set<String> primTypes = new HashSet<>()
 
     static final Set<String> complexTypes = new HashSet<>()
+    static final Set<String> cqlTypes = new HashSet<>()
     // structure to target class name mappings for logical model
     static final Map classNames = [
             'Adverseevent'              : 'AdverseEvent',
@@ -178,21 +180,26 @@ class QuickHtmlGenerator extends FhirSimpleBase {
 
     // mapping of fhir types to CQL types
     static final Map cqlTypeMap = [
+            'base64Binary'       : 'String',
             'boolean'            : 'Boolean',
             'Coding'             : 'Code',
             'CodeableConcept'    : 'Concept',
+            'code'               : 'String',
             'date'               : 'DateTime',
             'dateTime'           : 'DateTime',
             'decimal'            : 'Decimal',
+            'id'                 : 'String',
             'instant'            : 'DateTime',
             'integer'            : 'Integer',
             'string'             : 'String',
-            'Period'             : 'interval<DateTime>',
-            'Range'              : 'interval<Quantity>',
+            'positiveInt'        : 'Integer',
+            'Period'             : 'Interval<DateTime>',
+            'Range'              : 'Interval<Quantity>',
             'time'               : 'Time',
             'markdown'           : 'String',
             'Quantity'           : 'Quantity',
-            'uri'                : 'Uri',
+            'unsignedInt'        : 'Integer',
+            'uri'                : 'String',
     ]
 
     static {
@@ -245,17 +252,29 @@ class QuickHtmlGenerator extends FhirSimpleBase {
                 'Annotation',
                 'Attachment',
                 'ContactPoint',
+                'DateTime',
                 'Dosage',
                 'Duration',
                 'HumanName',
                 'Identifier',
                 'Meta',
                 'Money',
-                'Quantity',
                 'Ratio',
                 'SampledData',
                 'Signature',
                 'Timing',
+        ])
+
+        cqlTypes.addAll([
+                'Boolean',
+                'Code',
+                'Concept',
+                'DateTime',
+                'Decimal',
+                'Integer',
+                'Quantity',
+                'String',
+                "Time"
         ])
 
     }
@@ -1055,12 +1074,23 @@ class QuickHtmlGenerator extends FhirSimpleBase {
     }
 
 
+    void movePrimitives() {
+        File dirToCopy = new File('cql')
+        File destination = new File('html/pages')
+        try {
+            FileUtils.copyDirectory(dirToCopy, destination)
+        } catch (IOException e) {
+            e.printStackTrace()
+        }
+    }
+
 // ---------------------------------------------------------
 // generate field just for detailed class-level pages
 // ---------------------------------------------------------
     void dumpFields(html, StructureDefinition profile, String resourceName, String className,
                     ElementDefinitionHolder edh) {
 
+        movePrimitives()
         List<ElementDefinitionHolder> elts = edh.getChildren()
 
         //String tabName = 'All'
@@ -1609,9 +1639,22 @@ class QuickHtmlGenerator extends FhirSimpleBase {
             } else {
                 html.code {
                     boolean listType = elt.hasMax() && elt.getMax() == '*'
+                    if (sb.toString().contains("Interval")) {
+                        sb.insert(0, 'Interval&lt;')
+                        String t = sb.toString().replace('Interval&lt;', '').replace('&gt;', '')
+                        if (cqlTypes.contains(t)) {
+                            String s = "<a href='${t}.html'>$t</a>"
+                            sb.replace(12, 12 + s.length(), s)
+                            sb.append('>')
+                        }
+                    }
                     if (listType) {
                         sb.insert(0, 'List&lt;')
-                        //sb.append('&gt;')
+                        String t = sb.toString().replace('List&lt;', '')
+                        if (cqlTypes.contains(t)) {
+                            String s = "<a href='${t}.html'>$t</a>"
+                            sb.replace(8, 8 + s.length(), s)
+                        }
                     }
                     def types = sb.toString()
                     if (listType || types.contains('<') || types.contains('&lt;')) {
@@ -1619,8 +1662,16 @@ class QuickHtmlGenerator extends FhirSimpleBase {
                             types = types + ">"
                         }
                         mkp.yieldUnescaped(types)
-                    } else
-                        mkp.yield(types)
+                    }
+                    else {
+                        if (cqlTypes.contains(types)) {
+                            types = "<a href='${types}.html'>$types</a>"
+                            mkp.yieldUnescaped(types)
+                        }
+                        else {
+                            mkp.yield(types)
+                        }
+                    }
                 }
                 sb.setLength(0) // reset buffer
             }
@@ -2281,6 +2332,36 @@ class QuickHtmlGenerator extends FhirSimpleBase {
                                     a(href: "pages/${className}.html", className)
                                 }
                             }
+                        }
+                    }
+                    h2(title: 'Classes', 'Primitive Type Classes')
+                    ul(title: "Classes") {
+                        li {
+                            a(href: "pages/Boolean.html", 'Boolean')
+                        }
+                        li {
+                            a(href: "pages/Code.html", 'Code')
+                        }
+                        li {
+                            a(href: "pages/Concept.html", 'Concept')
+                        }
+                        li {
+                            a(href: "pages/DateTime.html", 'DateTime')
+                        }
+                        li {
+                            a(href: "pages/Decimal.html", 'Decimal')
+                        }
+                        li {
+                            a(href: "pages/Integer.html", 'Integer')
+                        }
+                        li {
+                            a(href: "pages/Quantity.html", 'Quantity')
+                        }
+                        li {
+                            a(href: "pages/String.html", 'String')
+                        }
+                        li {
+                            a(href: "pages/Time.html", 'Time')
                         }
                     }
                 }
